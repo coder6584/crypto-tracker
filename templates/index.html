@@ -226,8 +226,103 @@
     </div>
 
     <script>
-        // Initialize WebSocket connection
-        const socket = io();
+        // Initialize Socket.IO with error handling
+        const socket = io({
+            transports: ['websocket'],
+            reconnection: true,
+            reconnectionAttempts: 3,
+            reconnectionDelay: 1000
+        });
+
+        // Handle connection events
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            document.querySelectorAll('.loading').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.error-message').forEach(el => el.style.display = 'none');
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('Connection error:', error);
+            document.querySelectorAll('.error-message').forEach(el => el.style.display = 'block');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            document.querySelectorAll('.loading').forEach(el => el.style.display = 'block');
+        });
+
+        // Handle data updates
+        socket.on('data_update', (data) => {
+            console.log('Received data update:', data);
+            updateUI(data);
+        });
+
+        // Function to update UI with new data
+        function updateUI(data) {
+            try {
+                // Update Solana data
+                if (data.solana_token) {
+                    document.getElementById('solana-price').textContent = `$${data.solana_token.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                    document.getElementById('solana-volume').textContent = `$${data.solana_token.volume_24h.toLocaleString()}`;
+                    document.getElementById('solana-market-cap').textContent = `$${data.solana_token.market_cap.toLocaleString()}`;
+                    document.getElementById('solana-change').textContent = `${data.solana_token.change_24h.toFixed(2)}%`;
+                    document.getElementById('solana-change').className = `change ${data.solana_token.change_24h >= 0 ? 'positive' : 'negative'}`;
+                    document.getElementById('solana-update').textContent = new Date(data.solana_token.last_update).toLocaleString();
+                }
+
+                // Update BTC data
+                if (data.btc) {
+                    document.getElementById('btc-price').textContent = `$${data.btc.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                    document.getElementById('btc-volume').textContent = `$${data.btc.volume_24h.toLocaleString()}`;
+                    document.getElementById('btc-market-cap').textContent = `$${data.btc.market_cap.toLocaleString()}`;
+                    document.getElementById('btc-change').textContent = `${data.btc.change_24h.toFixed(2)}%`;
+                    document.getElementById('btc-change').className = `change ${data.btc.change_24h >= 0 ? 'positive' : 'negative'}`;
+                    document.getElementById('btc-update').textContent = new Date(data.btc.last_update).toLocaleString();
+                }
+
+                // Update top 100 table
+                if (data.top_100) {
+                    const tbody = document.querySelector('#top100-table tbody');
+                    tbody.innerHTML = '';
+                    data.top_100.forEach(coin => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${coin.market_cap_rank}</td>
+                            <td>
+                                <img src="${coin.image}" alt="${coin.name}" width="24" height="24">
+                                ${coin.name} (${coin.symbol.toUpperCase()})
+                            </td>
+                            <td>$${coin.current_price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td class="change ${coin.price_change_percentage_24h >= 0 ? 'positive' : 'negative'}">
+                                ${coin.price_change_percentage_24h.toFixed(2)}%
+                            </td>
+                            <td>$${coin.market_cap.toLocaleString()}</td>
+                            <td>$${coin.total_volume.toLocaleString()}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                }
+
+                // Hide loading indicators
+                document.querySelectorAll('.loading').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.error-message').forEach(el => el.style.display = 'none');
+            } catch (error) {
+                console.error('Error updating UI:', error);
+                document.querySelectorAll('.error-message').forEach(el => el.style.display = 'block');
+            }
+        }
+
+        // Initial data fetch
+        fetch('/api/data')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Initial data:', data);
+                updateUI(data);
+            })
+            .catch(error => {
+                console.error('Error fetching initial data:', error);
+                document.querySelectorAll('.error-message').forEach(el => el.style.display = 'block');
+            });
 
         // Initialize TradingView widgets
         new TradingView.widget({
@@ -259,22 +354,6 @@
             "save_image": false,
             "height": 400
         });
-
-        // Format number with commas and 2 decimal places
-        function formatNumber(num) {
-            return new Intl.NumberFormat('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }).format(num);
-        }
-
-        // Format large numbers with K/M/B
-        function formatLargeNumber(num) {
-            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
-            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
-            if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
-            return num.toFixed(2);
-        }
 
         // Tab switching functionality
         document.querySelectorAll('[data-tab]').forEach(tab => {
@@ -314,88 +393,6 @@
                 }
             });
         });
-
-        // Update the UI with new data
-        function updateUI(data) {
-            try {
-                // Update Solana Token data
-                const solanaPrice = data.solana_token.price;
-                const solanaChange = data.solana_token.change_24h;
-                
-                document.getElementById('solana-symbol').textContent = data.solana_token.symbol;
-                document.getElementById('solana-price').textContent = `$${formatNumber(solanaPrice)}`;
-                document.getElementById('solana-price').classList.remove('loading');
-                document.getElementById('solana-change').textContent = `${solanaChange > 0 ? '+' : ''}${formatNumber(solanaChange)}%`;
-                document.getElementById('solana-change').className = `text-sm ${solanaChange >= 0 ? 'price-up' : 'price-down'}`;
-                document.getElementById('solana-volume').textContent = `$${formatLargeNumber(data.solana_token.volume_24h)}`;
-                document.getElementById('solana-volume').classList.remove('loading');
-                document.getElementById('solana-market-cap').textContent = `$${formatLargeNumber(data.solana_token.market_cap)}`;
-                document.getElementById('solana-market-cap').classList.remove('loading');
-                document.getElementById('solana-update').textContent = new Date(data.solana_token.last_update).toLocaleTimeString();
-
-                // Update BTC data
-                const btcPrice = data.btc.price;
-                const btcChange = data.btc.change_24h;
-                
-                document.getElementById('btc-price').textContent = `$${formatNumber(btcPrice)}`;
-                document.getElementById('btc-price').classList.remove('loading');
-                document.getElementById('btc-change').textContent = `${btcChange > 0 ? '+' : ''}${formatNumber(btcChange)}%`;
-                document.getElementById('btc-change').className = `text-sm ${btcChange >= 0 ? 'price-up' : 'price-down'}`;
-                document.getElementById('btc-volume').textContent = `$${formatLargeNumber(data.btc.volume_24h)}`;
-                document.getElementById('btc-volume').classList.remove('loading');
-                document.getElementById('btc-market-cap').textContent = `$${formatLargeNumber(data.btc.market_cap)}`;
-                document.getElementById('btc-market-cap').classList.remove('loading');
-                document.getElementById('btc-update').textContent = new Date(data.btc.last_update).toLocaleTimeString();
-
-                // Update top 100 table
-                const tableBody = document.getElementById('top100-table');
-                const loadingMessage = document.getElementById('loading-message');
-                const errorMessage = document.getElementById('error-message');
-                
-                if (data.top_100 && data.top_100.length > 0) {
-                    loadingMessage.classList.add('hidden');
-                    errorMessage.classList.add('hidden');
-                    tableBody.innerHTML = data.top_100.map(coin => `
-                        <tr class="border-b border-gray-700 hover:bg-gray-800">
-                            <td class="py-4">${coin.market_cap_rank}</td>
-                            <td class="py-4">
-                                <div class="flex items-center">
-                                    <img src="${coin.image}" alt="${coin.name}" class="w-6 h-6 mr-2">
-                                    <span class="coin-name">${coin.name}</span>
-                                    <span class="coin-symbol text-gray-400 ml-2">${coin.symbol}</span>
-                                </div>
-                            </td>
-                            <td class="py-4 text-right">$${formatNumber(coin.current_price)}</td>
-                            <td class="py-4 text-right ${coin.price_change_percentage_24h >= 0 ? 'price-up' : 'price-down'}">
-                                ${coin.price_change_percentage_24h >= 0 ? '+' : ''}${formatNumber(coin.price_change_percentage_24h)}%
-                            </td>
-                            <td class="py-4 text-right">$${formatLargeNumber(coin.market_cap)}</td>
-                            <td class="py-4 text-right">$${formatLargeNumber(coin.total_volume)}</td>
-                        </tr>
-                    `).join('');
-                } else {
-                    loadingMessage.classList.remove('hidden');
-                    errorMessage.classList.remove('hidden');
-                }
-            } catch (error) {
-                console.error('Error updating UI:', error);
-                document.getElementById('error-message').classList.remove('hidden');
-            }
-        }
-
-        // Listen for WebSocket updates
-        socket.on('data_update', function(data) {
-            updateUI(data);
-        });
-
-        // Initial data load
-        fetch('/api/data')
-            .then(response => response.json())
-            .then(data => updateUI(data))
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('error-message').classList.remove('hidden');
-            });
     </script>
 </body>
 </html> 

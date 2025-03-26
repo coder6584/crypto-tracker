@@ -68,7 +68,9 @@ crypto_data = {
 
 def fetch_from_binance(symbol):
     try:
+        logging.info(f"Attempting to fetch {symbol} from Binance...")
         ticker = binance.fetch_ticker(f"{symbol}/USDT")
+        logging.info(f"Successfully fetched {symbol} data from Binance")
         return {
             'price': ticker['last'],
             'volume_24h': ticker['quoteVolume'],
@@ -80,9 +82,11 @@ def fetch_from_binance(symbol):
 
 def fetch_from_coingecko(symbol):
     try:
+        logging.info(f"Attempting to fetch {symbol} from CoinGecko...")
         if symbol.lower() == 'btc':
             symbol = 'bitcoin'
         data = cg.get_price(ids=[symbol.lower()], vs_currencies='usd', include_24hr_change=True, include_24hr_vol=True, include_market_cap=True)
+        logging.info(f"Successfully fetched {symbol} data from CoinGecko")
         if symbol.lower() in data:
             return data[symbol.lower()]
         return None
@@ -119,6 +123,7 @@ def fetch_top_100_coins():
 def fetch_solana_token_data():
     """Fetch token data from multiple sources"""
     try:
+        logging.info("Starting Solana data fetch...")
         # Try Binance first
         binance_data = fetch_from_binance('SOL')
         if binance_data:
@@ -128,7 +133,7 @@ def fetch_solana_token_data():
                 'change_24h': binance_data['change_24h'],
                 'last_update': datetime.now().isoformat()
             })
-            logging.info("Updated Solana data from Binance")
+            logging.info(f"Updated Solana data from Binance: {binance_data}")
             return crypto_data['solana_token']
 
         # Fallback to CoinGecko
@@ -141,7 +146,7 @@ def fetch_solana_token_data():
                 'change_24h': cg_data['usd_24h_change'],
                 'last_update': datetime.now().isoformat()
             })
-            logging.info("Updated Solana data from CoinGecko")
+            logging.info(f"Updated Solana data from CoinGecko: {cg_data}")
             
         return crypto_data['solana_token']
                     
@@ -152,6 +157,7 @@ def fetch_solana_token_data():
 def fetch_btc_data():
     """Fetch BTC data from multiple sources"""
     try:
+        logging.info("Starting BTC data fetch...")
         # Try Binance first
         binance_data = fetch_from_binance('BTC')
         if binance_data:
@@ -161,7 +167,7 @@ def fetch_btc_data():
                 'change_24h': binance_data['change_24h'],
                 'last_update': datetime.now().isoformat()
             })
-            logging.info("Updated BTC data from Binance")
+            logging.info(f"Updated BTC data from Binance: {binance_data}")
             return crypto_data['btc']
 
         # Fallback to CoinGecko
@@ -174,7 +180,7 @@ def fetch_btc_data():
                 'change_24h': cg_data['usd_24h_change'],
                 'last_update': datetime.now().isoformat()
             })
-            logging.info("Updated BTC data from CoinGecko")
+            logging.info(f"Updated BTC data from CoinGecko: {cg_data}")
             
         return crypto_data['btc']
                     
@@ -184,12 +190,15 @@ def fetch_btc_data():
 
 def update_data():
     """Update data function"""
+    logging.info("Starting data update thread...")
     while True:
         try:
             with app.app_context():
+                logging.info("Fetching new data...")
                 fetch_solana_token_data()
                 fetch_btc_data()
                 fetch_top_100_coins()
+                logging.info(f"Current crypto data: {crypto_data}")
                 socketio.emit('data_update', crypto_data, namespace='/')
                 logging.info("Emitted data update")
         except Exception as e:
@@ -198,16 +207,19 @@ def update_data():
 
 @app.route('/')
 def index():
+    logging.info("Rendering index page")
     return render_template('index.html')
 
 @app.route('/api/data')
 def get_data():
+    logging.info("API data request received")
     return jsonify(crypto_data)
 
 @socketio.on('connect', namespace='/')
 def handle_connect():
     logging.info('Client connected')
     socketio.emit('data_update', crypto_data, namespace='/')
+    logging.info('Sent initial data to client')
 
 @socketio.on('disconnect', namespace='/')
 def handle_disconnect():
