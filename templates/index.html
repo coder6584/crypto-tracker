@@ -63,6 +63,27 @@
             border-radius: 5px;
             margin: 10px 0;
         }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -79,6 +100,24 @@
                 <div>24h Volume: <span id="solana-volume" class="loading">Loading...</span></div>
                 <div>Market Cap: <span id="solana-market-cap" class="loading">Loading...</span></div>
                 <div>Last Update: <span id="solana-update">Never</span></div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">Active Validators</div>
+                    <div class="stat-value" id="solana-validators" class="loading">Loading...</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Total Supply</div>
+                    <div class="stat-value" id="solana-supply" class="loading">Loading...</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">TPS</div>
+                    <div class="stat-value" id="solana-tps" class="loading">Loading...</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Block Time</div>
+                    <div class="stat-value" id="solana-block-time" class="loading">Loading...</div>
+                </div>
             </div>
         </div>
 
@@ -138,6 +177,14 @@
                     document.getElementById('solana-change').textContent = `${data.solana_token.change_24h.toFixed(2)}%`;
                     document.getElementById('solana-change').className = `change ${data.solana_token.change_24h >= 0 ? 'positive' : 'negative'}`;
                     document.getElementById('solana-update').textContent = new Date(data.solana_token.last_update).toLocaleString();
+
+                    // Update network stats
+                    if (data.solana_token.network_stats) {
+                        document.getElementById('solana-validators').textContent = data.solana_token.network_stats.active_validators.toLocaleString();
+                        document.getElementById('solana-supply').textContent = (data.solana_token.network_stats.total_supply / 1e9).toLocaleString(undefined, {maximumFractionDigits: 2}) + ' SOL';
+                        document.getElementById('solana-tps').textContent = data.solana_token.network_stats.tps.toLocaleString();
+                        document.getElementById('solana-block-time').textContent = data.solana_token.network_stats.block_time.toLocaleString() + ' ms';
+                    }
                 }
 
                 // Update BTC data

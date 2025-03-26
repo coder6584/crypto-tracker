@@ -50,8 +50,12 @@ binance = ccxt.binance({
 })
 
 # Solana API endpoints
-SOLANA_API_URL = "https://api.solanafn.com/v1"
-SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com"
+SOLANA_APIS = {
+    'solanafn': "https://api.solanafn.com/v1",
+    'solscan': "https://public-api.solscan.io",
+    'solana': "https://api.mainnet-beta.solana.com",
+    'coingecko': "https://api.coingecko.com/api/v3"
+}
 
 # Global data storage with default values
 crypto_data = {
@@ -62,7 +66,14 @@ crypto_data = {
         'last_update': None,
         'name': 'Solana',
         'symbol': 'SOL',
-        'change_24h': 0
+        'change_24h': 0,
+        'network_stats': {
+            'active_validators': 0,
+            'total_supply': 0,
+            'circulating_supply': 0,
+            'block_time': 0,
+            'tps': 0
+        }
     },
     'btc': {
         'price': 0,
@@ -74,14 +85,14 @@ crypto_data = {
     'top_100': []
 }
 
-def fetch_from_solana():
-    """Fetch Solana data from Solana API"""
+def fetch_from_solanafn():
+    """Fetch Solana data from SolanaFN API"""
     try:
-        logging.info("Attempting to fetch Solana data from Solana API...")
-        response = requests.get(f"{SOLANA_API_URL}/price")
+        logging.info("Attempting to fetch Solana data from SolanaFN API...")
+        response = requests.get(f"{SOLANA_APIS['solanafn']}/price")
         if response.status_code == 200:
             data = response.json()
-            logging.info(f"Successfully fetched Solana data: {data}")
+            logging.info(f"Successfully fetched Solana data from SolanaFN: {data}")
             return {
                 'price': data.get('price', 0),
                 'volume_24h': data.get('volume24h', 0),
@@ -90,7 +101,27 @@ def fetch_from_solana():
             }
         return None
     except Exception as e:
-        logging.error(f"Error fetching from Solana API: {str(e)}")
+        logging.error(f"Error fetching from SolanaFN API: {str(e)}")
+        return None
+
+def fetch_from_solscan():
+    """Fetch Solana network stats from Solscan API"""
+    try:
+        logging.info("Attempting to fetch Solana network stats from Solscan...")
+        response = requests.get(f"{SOLANA_APIS['solscan']}/chain/stat")
+        if response.status_code == 200:
+            data = response.json()
+            logging.info(f"Successfully fetched Solana network stats from Solscan: {data}")
+            return {
+                'active_validators': data.get('activeValidators', 0),
+                'total_supply': data.get('totalSupply', 0),
+                'circulating_supply': data.get('circulatingSupply', 0),
+                'block_time': data.get('blockTime', 0),
+                'tps': data.get('tps', 0)
+            }
+        return None
+    except Exception as e:
+        logging.error(f"Error fetching from Solscan API: {str(e)}")
         return None
 
 def fetch_from_binance(symbol):
@@ -152,22 +183,27 @@ def fetch_solana_token_data():
     try:
         logging.info("Starting Solana data fetch...")
         
-        # Try Solana API first
-        solana_data = fetch_from_solana()
-        if solana_data:
+        # Try SolanaFN API first
+        solanafn_data = fetch_from_solanafn()
+        if solanafn_data:
             crypto_data['solana_token'].update({
-                'price': solana_data['price'],
-                'volume_24h': solana_data['volume_24h'],
-                'market_cap': solana_data['market_cap'],
-                'change_24h': solana_data['change_24h'],
+                'price': solanafn_data['price'],
+                'volume_24h': solanafn_data['volume_24h'],
+                'market_cap': solanafn_data['market_cap'],
+                'change_24h': solanafn_data['change_24h'],
                 'last_update': datetime.now().isoformat()
             })
-            logging.info(f"Updated Solana data from Solana API: {solana_data}")
-            return crypto_data['solana_token']
+            logging.info(f"Updated Solana data from SolanaFN: {solanafn_data}")
 
-        # Try Binance as backup
+        # Fetch network stats from Solscan
+        solscan_data = fetch_from_solscan()
+        if solscan_data:
+            crypto_data['solana_token']['network_stats'].update(solscan_data)
+            logging.info(f"Updated Solana network stats from Solscan: {solscan_data}")
+
+        # Try Binance as backup for price data
         binance_data = fetch_from_binance('SOL')
-        if binance_data:
+        if binance_data and not solanafn_data:
             crypto_data['solana_token'].update({
                 'price': binance_data['price'],
                 'volume_24h': binance_data['volume_24h'],
@@ -175,19 +211,19 @@ def fetch_solana_token_data():
                 'last_update': datetime.now().isoformat()
             })
             logging.info(f"Updated Solana data from Binance: {binance_data}")
-            return crypto_data['solana_token']
 
-        # Fallback to CoinGecko
-        cg_data = fetch_from_coingecko('solana')
-        if cg_data:
-            crypto_data['solana_token'].update({
-                'price': cg_data['usd'],
-                'volume_24h': cg_data['usd_24h_vol'],
-                'market_cap': cg_data['usd_market_cap'],
-                'change_24h': cg_data['usd_24h_change'],
-                'last_update': datetime.now().isoformat()
-            })
-            logging.info(f"Updated Solana data from CoinGecko: {cg_data}")
+        # Fallback to CoinGecko if needed
+        if not solanafn_data and not binance_data:
+            cg_data = fetch_from_coingecko('solana')
+            if cg_data:
+                crypto_data['solana_token'].update({
+                    'price': cg_data['usd'],
+                    'volume_24h': cg_data['usd_24h_vol'],
+                    'market_cap': cg_data['usd_market_cap'],
+                    'change_24h': cg_data['usd_24h_change'],
+                    'last_update': datetime.now().isoformat()
+                })
+                logging.info(f"Updated Solana data from CoinGecko: {cg_data}")
             
         return crypto_data['solana_token']
                     
