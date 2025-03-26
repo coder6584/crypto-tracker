@@ -3,224 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Tracker - Real-time Price Monitor</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <title>Crypto Tracker</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <!-- TradingView Widget -->
-    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-    <!-- Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-XXXXXXXXXX');
-    </script>
+    <script src="https://s3.tradingview.com/tv.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .gradient-bg {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        body {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 250px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2rem;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        .tab {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .tab.active {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .tab i {
+            margin-right: 1rem;
+            font-size: 1.25rem;
         }
         .card {
             background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: all 0.3s ease;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: transform 0.3s ease;
         }
         .card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
         }
-        .price-up {
+        .price {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 1rem 0;
+        }
+        .change {
+            font-size: 1.25rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.5rem;
+            display: inline-block;
+        }
+        .change.positive {
+            background: rgba(0, 255, 0, 0.1);
             color: #00ff00;
         }
-        .price-down {
-            color: #ff4444;
+        .change.negative {
+            background: rgba(255, 0, 0, 0.1);
+            color: #ff0000;
         }
         .loading {
-            animation: pulse 2s infinite;
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #ffffff;
+            animation: spin 1s linear infinite;
         }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
-        .tab-active {
+        .error-message {
+            display: none;
+            color: #ff0000;
+            background: rgba(255, 0, 0, 0.1);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        th {
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        .search-input {
+            width: 100%;
+            padding: 0.75rem;
             background: rgba(255, 255, 255, 0.1);
-            border-left: 4px solid #3b82f6;
+            border: none;
+            border-radius: 0.5rem;
+            color: #ffffff;
+            margin-bottom: 1rem;
         }
-        .tab-inactive {
-            border-left: 4px solid transparent;
-        }
-        .tab-inactive:hover {
-            background: rgba(255, 255, 255, 0.05);
+        .search-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
         }
     </style>
 </head>
-<body class="gradient-bg min-h-screen text-white">
-    <div class="flex h-screen">
-        <!-- Sidebar -->
-        <div class="w-64 bg-gray-900 p-4">
-            <div class="mb-8">
-                <h1 class="text-2xl font-bold text-blue-500">Crypto Tracker</h1>
-                <p class="text-sm text-gray-400">Real-time monitoring</p>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2 class="text-xl font-bold mb-6">Crypto Tracker</h2>
+            <div class="tab active" data-tab="dashboard">
+                <i>📊</i> Dashboard
             </div>
-            <nav class="space-y-2">
-                <a href="#" class="tab-active flex items-center p-3 rounded-lg text-white" data-tab="dashboard">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-                    </svg>
-                    Dashboard
-                </a>
-                <a href="#" class="tab-inactive flex items-center p-3 rounded-lg text-gray-400 hover:text-white" data-tab="top100">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                    Top 100
-                </a>
-                <a href="#" class="tab-inactive flex items-center p-3 rounded-lg text-gray-400 hover:text-white">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    Alerts
-                </a>
-            </nav>
+            <div class="tab" data-tab="top100">
+                <i>📈</i> Top 100
+            </div>
+            <div class="tab" data-tab="analytics">
+                <i>📉</i> Analytics
+            </div>
+            <div class="tab" data-tab="alerts">
+                <i>🔔</i> Alerts
+            </div>
         </div>
-
-        <!-- Main Content -->
-        <div class="flex-1 overflow-auto p-8">
-            <!-- Dashboard Tab -->
-            <div id="dashboard-tab" class="tab-content">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <!-- Solana Token Card -->
-                    <div class="card rounded-lg p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <div class="flex items-center">
-                                <img src="https://cryptologos.cc/logos/solana-sol-logo.png" alt="Solana" class="w-8 h-8 mr-3">
-                                <div>
-                                    <h2 class="text-2xl font-semibold">Solana Token</h2>
-                                    <span id="solana-symbol" class="text-gray-400">SOL</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="space-y-4">
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-300">Price:</span>
-                                <div class="text-right">
-                                    <span id="solana-price" class="text-xl font-bold loading">$0.00</span>
-                                    <div id="solana-change" class="text-sm">0.00%</div>
-                                </div>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-300">24h Volume:</span>
-                                <span id="solana-volume" class="text-xl loading">$0.00</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-300">Market Cap:</span>
-                                <span id="solana-market-cap" class="text-xl loading">$0.00</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-300">Last Update:</span>
-                                <span id="solana-update" class="text-sm text-gray-400">Never</span>
-                            </div>
-                        </div>
+        <div class="main-content">
+            <div id="dashboard" class="tab-content active">
+                <div class="card">
+                    <h3>Solana Token</h3>
+                    <div class="price">
+                        <span id="solana-price" class="loading">Loading...</span>
                     </div>
-
-                    <!-- BTC Card -->
-                    <div class="card rounded-lg p-6">
-                        <div class="flex items-center mb-4">
-                            <img src="https://cryptologos.cc/logos/bitcoin-btc-logo.png" alt="Bitcoin" class="w-8 h-8 mr-3">
-                            <h2 class="text-2xl font-semibold">Bitcoin (BTC)</h2>
-                        </div>
-                        <div class="space-y-4">
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-300">Price:</span>
-                                <div class="text-right">
-                                    <span id="btc-price" class="text-xl font-bold loading">$0.00</span>
-                                    <div id="btc-change" class="text-sm">0.00%</div>
-                                </div>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-300">24h Volume:</span>
-                                <span id="btc-volume" class="text-xl loading">$0.00</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-300">Market Cap:</span>
-                                <span id="btc-market-cap" class="text-xl loading">$0.00</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-300">Last Update:</span>
-                                <span id="btc-update" class="text-sm text-gray-400">Never</span>
-                            </div>
-                        </div>
+                    <div class="change" id="solana-change">0.00%</div>
+                    <div class="mt-4">
+                        <div>24h Volume: <span id="solana-volume" class="loading">Loading...</span></div>
+                        <div>Market Cap: <span id="solana-market-cap" class="loading">Loading...</span></div>
+                        <div>Last Update: <span id="solana-update">Never</span></div>
                     </div>
+                    <div id="solana-chart" style="height: 400px; margin-top: 1rem;"></div>
                 </div>
-
-                <!-- TradingView Charts -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Solana Chart -->
-                    <div class="card rounded-lg p-6">
-                        <h2 class="text-2xl font-semibold mb-4">Solana Price Chart</h2>
-                        <div class="tradingview-widget-container">
-                            <div id="solana_chart" style="height: 400px;"></div>
-                        </div>
+                <div class="card">
+                    <h3>Bitcoin (BTC)</h3>
+                    <div class="price">
+                        <span id="btc-price" class="loading">Loading...</span>
                     </div>
-
-                    <!-- Bitcoin Chart -->
-                    <div class="card rounded-lg p-6">
-                        <h2 class="text-2xl font-semibold mb-4">Bitcoin Price Chart</h2>
-                        <div class="tradingview-widget-container">
-                            <div id="btc_chart" style="height: 400px;"></div>
-                        </div>
+                    <div class="change" id="btc-change">0.00%</div>
+                    <div class="mt-4">
+                        <div>24h Volume: <span id="btc-volume" class="loading">Loading...</span></div>
+                        <div>Market Cap: <span id="btc-market-cap" class="loading">Loading...</span></div>
+                        <div>Last Update: <span id="btc-update">Never</span></div>
                     </div>
+                    <div id="btc-chart" style="height: 400px; margin-top: 1rem;"></div>
                 </div>
             </div>
-
-            <!-- Top 100 Tab -->
-            <div id="top100-tab" class="tab-content hidden">
-                <div class="card rounded-lg p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-2xl font-semibold">Top 100 Cryptocurrencies</h2>
-                        <div class="flex items-center space-x-4">
-                            <input type="text" id="coin-search" placeholder="Search coins..." class="bg-gray-800 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <div id="loading-message" class="text-center py-8">
-                            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-                            <p class="mt-4 text-gray-400">Loading cryptocurrency data...</p>
-                        </div>
-                        <div id="error-message" class="hidden text-center py-8 text-red-500">
-                            Error loading data. Please try again later.
-                        </div>
-                        <table class="w-full">
-                            <thead>
-                                <tr class="text-left text-gray-400 border-b border-gray-700">
-                                    <th class="pb-4">#</th>
-                                    <th class="pb-4">Name</th>
-                                    <th class="pb-4 text-right">Price</th>
-                                    <th class="pb-4 text-right">24h Change</th>
-                                    <th class="pb-4 text-right">Market Cap</th>
-                                    <th class="pb-4 text-right">24h Volume</th>
-                                </tr>
-                            </thead>
-                            <tbody id="top100-table">
-                                <!-- Table rows will be populated by JavaScript -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <div id="top100" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-4">Top 100 Cryptocurrencies</h2>
+                <input type="text" class="search-input" placeholder="Search coins..." id="search-input">
+                <div class="error-message" id="error-message">Error loading data. Please try again later.</div>
+                <table id="top100-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>24h Change</th>
+                            <th>Market Cap</th>
+                            <th>24h Volume</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="6" class="text-center">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-
-            <!-- Analytics Tab -->
-            <div id="analytics-tab" class="tab-content hidden">
-                <h2 class="text-2xl font-semibold mb-6">Analytics</h2>
-                <p class="text-gray-400">Coming soon...</p>
+            <div id="analytics" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-4">Analytics</h2>
+                <p>Coming soon...</p>
             </div>
-
-            <!-- Alerts Tab -->
-            <div id="alerts-tab" class="tab-content hidden">
-                <h2 class="text-2xl font-semibold mb-6">Price Alerts</h2>
-                <p class="text-gray-400">Coming soon...</p>
+            <div id="alerts" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-4">Price Alerts</h2>
+                <p>Coming soon...</p>
             </div>
         </div>
     </div>
@@ -326,7 +306,7 @@
 
         // Initialize TradingView widgets
         new TradingView.widget({
-            "container_id": "solana_chart",
+            "container_id": "solana-chart",
             "symbol": "BINANCE:SOLUSDT",
             "interval": "1",
             "theme": "dark",
@@ -341,7 +321,7 @@
         });
 
         new TradingView.widget({
-            "container_id": "btc_chart",
+            "container_id": "btc-chart",
             "symbol": "BINANCE:BTCUSDT",
             "interval": "1",
             "theme": "dark",
@@ -356,41 +336,27 @@
         });
 
         // Tab switching functionality
-        document.querySelectorAll('[data-tab]').forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                e.preventDefault();
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
                 
-                // Update active tab
-                document.querySelectorAll('[data-tab]').forEach(t => {
-                    t.classList.remove('tab-active', 'text-white');
-                    t.classList.add('tab-inactive', 'text-gray-400');
-                });
-                tab.classList.remove('tab-inactive', 'text-gray-400');
-                tab.classList.add('tab-active', 'text-white');
-
-                // Show selected content
-                document.querySelectorAll('.tab-content').forEach(content => {
-                    content.classList.add('hidden');
-                });
-                document.getElementById(`${tab.dataset.tab}-tab`).classList.remove('hidden');
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                const tabId = tab.getAttribute('data-tab');
+                document.getElementById(tabId).classList.remove('hidden');
             });
         });
 
         // Search functionality
-        const searchInput = document.getElementById('coin-search');
-        searchInput.addEventListener('input', (e) => {
+        document.getElementById('search-input').addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
-            const rows = document.querySelectorAll('#top100-table tr');
+            const rows = document.querySelectorAll('#top100-table tbody tr');
             
             rows.forEach(row => {
-                const name = row.querySelector('.coin-name').textContent.toLowerCase();
-                const symbol = row.querySelector('.coin-symbol').textContent.toLowerCase();
-                
-                if (name.includes(searchTerm) || symbol.includes(searchTerm)) {
-                    row.classList.remove('hidden');
-                } else {
-                    row.classList.add('hidden');
-                }
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
             });
         });
     </script>
