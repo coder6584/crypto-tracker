@@ -5,7 +5,7 @@ python-dotenv==1.0.0
 pycoingecko==3.1.0
 gunicorn==21.2.0
 eventlet==0.35.2
-Werkzeug==3.0.1
+Werkzeug>=3.1.0
 click==8.1.7
 itsdangerous==2.1.2
 Jinja2==3.1.3
