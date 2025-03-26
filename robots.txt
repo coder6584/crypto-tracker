@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://crypto-tracker-xxxx.onrender.com/sitemap.xml 

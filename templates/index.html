@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .price-up {
+            color: #00ff00;
+        }
+        .price-down {
+            color: #ff4444;
+        }
+        .loading {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen text-white">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold text-center mb-2">Crypto Tracker</h1>
+        <p class="text-center text-gray-400 mb-8">Real-time cryptocurrency price tracking</p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Solana Token Card -->
+            <div class="card rounded-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold">Solana Token</h2>
+                    <span id="solana-symbol" class="text-gray-400">Loading...</span>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-300">Price:</span>
+                        <div class="text-right">
+                            <span id="solana-price" class="text-xl font-bold loading">$0.00</span>
+                            <div id="solana-change" class="text-sm">0.00%</div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-300">24h Volume:</span>
+                        <span id="solana-volume" class="text-xl loading">$0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-300">Market Cap:</span>
+                        <span id="solana-market-cap" class="text-xl loading">$0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-300">Last Update:</span>
+                        <span id="solana-update" class="text-sm text-gray-400">Never</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BTC Card -->
+            <div class="card rounded-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4">Bitcoin (BTC)</h2>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-300">Price:</span>
+                        <div class="text-right">
+                            <span id="btc-price" class="text-xl font-bold loading">$0.00</span>
+                            <div id="btc-change" class="text-sm">0.00%</div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-300">24h Volume:</span>
+                        <span id="btc-volume" class="text-xl loading">$0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-300">Market Cap:</span>
+                        <span id="btc-market-cap" class="text-xl loading">$0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-300">Last Update:</span>
+                        <span id="btc-update" class="text-sm text-gray-400">Never</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Price Chart -->
+        <div class="card rounded-lg p-6 mt-6">
+            <h2 class="text-2xl font-semibold mb-4">Price History</h2>
+            <canvas id="priceChart" height="300"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Initialize WebSocket connection
+        const socket = io();
+        let priceHistory = {
+            solana: [],
+            btc: []
+        };
+
+        // Initialize Chart.js
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        const priceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Solana Token',
+                        data: [],
+                        borderColor: '#00ff00',
+                        tension: 0.4,
+                        fill: false
+                    },
+                    {
+                        label: 'Bitcoin',
+                        data: [],
+                        borderColor: '#ff9900',
+                        tension: 0.4,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#ffffff'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#ffffff'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#ffffff'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#ffffff',
+                        bodyColor: '#ffffff',
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 1,
+                        padding: 10,
+                        displayColors: true,
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: $${formatNumber(context.parsed.y)}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Format number with commas and 2 decimal places
+        function formatNumber(num) {
+            return new Intl.NumberFormat('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(num);
+        }
+
+        // Format large numbers with K/M/B
+        function formatLargeNumber(num) {
+            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+            return num.toFixed(2);
+        }
+
+        // Update the UI with new data
+        function updateUI(data) {
+            // Update Solana Token data
+            const solanaPrice = data.solana_token.price;
+            const solanaChange = data.solana_token.change_24h;
+            
+            document.getElementById('solana-symbol').textContent = data.solana_token.symbol;
+            document.getElementById('solana-price').textContent = `$${formatNumber(solanaPrice)}`;
+            document.getElementById('solana-price').classList.remove('loading');
+            document.getElementById('solana-change').textContent = `${solanaChange > 0 ? '+' : ''}${formatNumber(solanaChange)}%`;
+            document.getElementById('solana-change').className = `text-sm ${solanaChange >= 0 ? 'price-up' : 'price-down'}`;
+            document.getElementById('solana-volume').textContent = `$${formatLargeNumber(data.solana_token.volume_24h)}`;
+            document.getElementById('solana-volume').classList.remove('loading');
+            document.getElementById('solana-market-cap').textContent = `$${formatLargeNumber(data.solana_token.market_cap)}`;
+            document.getElementById('solana-market-cap').classList.remove('loading');
+            document.getElementById('solana-update').textContent = new Date(data.solana_token.last_update).toLocaleTimeString();
+
+            // Update BTC data
+            const btcPrice = data.btc.price;
+            const btcChange = data.btc.change_24h;
+            
+            document.getElementById('btc-price').textContent = `$${formatNumber(btcPrice)}`;
+            document.getElementById('btc-price').classList.remove('loading');
+            document.getElementById('btc-change').textContent = `${btcChange > 0 ? '+' : ''}${formatNumber(btcChange)}%`;
+            document.getElementById('btc-change').className = `text-sm ${btcChange >= 0 ? 'price-up' : 'price-down'}`;
+            document.getElementById('btc-volume').textContent = `$${formatLargeNumber(data.btc.volume_24h)}`;
+            document.getElementById('btc-volume').classList.remove('loading');
+            document.getElementById('btc-market-cap').textContent = `$${formatLargeNumber(data.btc.market_cap)}`;
+            document.getElementById('btc-market-cap').classList.remove('loading');
+            document.getElementById('btc-update').textContent = new Date(data.btc.last_update).toLocaleTimeString();
+
+            // Update chart
+            const timestamp = new Date().toLocaleTimeString();
+            priceChart.data.labels.push(timestamp);
+            priceChart.data.datasets[0].data.push(solanaPrice);
+            priceChart.data.datasets[1].data.push(btcPrice);
+
+            // Keep only last 20 data points
+            if (priceChart.data.labels.length > 20) {
+                priceChart.data.labels.shift();
+                priceChart.data.datasets[0].data.shift();
+                priceChart.data.datasets[1].data.shift();
+            }
+
+            priceChart.update();
+        }
+
+        // Listen for WebSocket updates
+        socket.on('data_update', function(data) {
+            updateUI(data);
+        });
+
+        // Initial data load
+        fetch('/api/data')
+            .then(response => response.json())
+            .then(data => updateUI(data))
+            .catch(error => console.error('Error:', error));
+    </script>
+</body>
+</html> 
