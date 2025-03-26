@@ -9,7 +9,6 @@ import threading
 import time
 import logging
 from pycoingecko import CoinGeckoAPI
-from binance.client import Client
 import ccxt
 import eventlet
 eventlet.monkey_patch()
@@ -41,11 +40,16 @@ socketio = SocketIO(
     max_http_buffer_size=1e8
 )
 
-# Initialize API clients
+# Initialize API clients with rate limiting
 cg = CoinGeckoAPI()
-binance = ccxt.binance()
+binance = ccxt.binance({
+    'enableRateLimit': True,
+    'options': {
+        'defaultType': 'spot'
+    }
+})
 
-# Global data storage
+# Global data storage with default values
 crypto_data = {
     'solana_token': {
         'price': 0,
