@@ -1,8 +1,10 @@
-flask==2.3.3
+flask==3.0.0
 flask-socketio==5.3.6
 requests==2.31.0
 python-dotenv==1.0.0
 pycoingecko==3.1.0
+ccxt==4.1.13
+python-binance==1.0.19
 gunicorn==21.2.0
 eventlet==0.33.3
 Werkzeug==2.3.7
