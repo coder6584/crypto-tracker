@@ -49,6 +49,10 @@ binance = ccxt.binance({
     }
 })
 
+# Solana API endpoints
+SOLANA_API_URL = "https://api.solanafn.com/v1"
+SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com"
+
 # Global data storage with default values
 crypto_data = {
     'solana_token': {
@@ -69,6 +73,25 @@ crypto_data = {
     },
     'top_100': []
 }
+
+def fetch_from_solana():
+    """Fetch Solana data from Solana API"""
+    try:
+        logging.info("Attempting to fetch Solana data from Solana API...")
+        response = requests.get(f"{SOLANA_API_URL}/price")
+        if response.status_code == 200:
+            data = response.json()
+            logging.info(f"Successfully fetched Solana data: {data}")
+            return {
+                'price': data.get('price', 0),
+                'volume_24h': data.get('volume24h', 0),
+                'market_cap': data.get('marketCap', 0),
+                'change_24h': data.get('priceChange24h', 0)
+            }
+        return None
+    except Exception as e:
+        logging.error(f"Error fetching from Solana API: {str(e)}")
+        return None
 
 def fetch_from_binance(symbol):
     try:
@@ -128,7 +151,21 @@ def fetch_solana_token_data():
     """Fetch token data from multiple sources"""
     try:
         logging.info("Starting Solana data fetch...")
-        # Try Binance first
+        
+        # Try Solana API first
+        solana_data = fetch_from_solana()
+        if solana_data:
+            crypto_data['solana_token'].update({
+                'price': solana_data['price'],
+                'volume_24h': solana_data['volume_24h'],
+                'market_cap': solana_data['market_cap'],
+                'change_24h': solana_data['change_24h'],
+                'last_update': datetime.now().isoformat()
+            })
+            logging.info(f"Updated Solana data from Solana API: {solana_data}")
+            return crypto_data['solana_token']
+
+        # Try Binance as backup
         binance_data = fetch_from_binance('SOL')
         if binance_data:
             crypto_data['solana_token'].update({
